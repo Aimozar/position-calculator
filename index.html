@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>仓位计算器 — Position Calculator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #21253a;
+      --border: #2e3250;
+      --accent: #4f7cff;
+      --accent-hover: #6b94ff;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --text: #e2e8f0;
+      --text-muted: #8892a4;
+      --radius: 12px;
+      --shadow: 0 4px 24px rgba(0,0,0,.4);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #4f7cff, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      margin-top: 6px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 480px) {
+      .field-grid { grid-template-columns: 1fr; }
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .field label span.hint {
+      font-weight: 400;
+      font-size: 0.75rem;
+      color: #555e78;
+      margin-left: 4px;
+    }
+
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-wrap .prefix,
+    .input-wrap .suffix {
+      position: absolute;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .input-wrap .prefix { left: 11px; }
+    .input-wrap .suffix { right: 11px; }
+
+    .input-wrap input {
+      width: 100%;
+      padding: 10px 36px 10px 28px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+      -moz-appearance: textfield;
+    }
+
+    .input-wrap input::-webkit-outer-spin-button,
+    .input-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .input-wrap input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79,124,255,.18);
+    }
+
+    .input-wrap.no-prefix input { padding-left: 11px; }
+
+    /* Direction toggle */
+    .direction-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .dir-btn {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      text-align: center;
+    }
+
+    .dir-btn.active.long  { background: rgba(34,197,94,.12); border-color: var(--green); color: var(--green); }
+    .dir-btn.active.short { background: rgba(239,68,68,.12);  border-color: var(--red);   color: var(--red); }
+
+    /* Results */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+
+    @media (max-width: 480px) {
+      .results-grid { grid-template-columns: 1fr; }
+    }
+
+    .result-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .result-item .label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .result-item .value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .result-item .value.green { color: var(--green); }
+    .result-item .value.red   { color: var(--red); }
+    .result-item .value.yellow { color: var(--yellow); }
+    .result-item .sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .result-item.wide {
+      grid-column: span 2;
+    }
+    @media (max-width: 480px) {
+      .result-item.wide { grid-column: span 1; }
+    }
+
+    /* Slider */
+    .slider-field { display: flex; flex-direction: column; gap: 8px; }
+    .slider-row { display: flex; align-items: center; gap: 12px; }
+    input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+      height: 4px;
+      cursor: pointer;
+    }
+    .slider-val {
+      min-width: 52px;
+      text-align: right;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* Warning */
+    .warning {
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.82rem;
+      color: #fca5a5;
+      display: none;
+    }
+    .warning.show { display: block; }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 24px 0 8px;
+      font-size: 0.9rem;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 32px;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>仓位计算器</h1>
+    <p>Position Size Calculator · 量化风险，精准入场</p>
+  </header>
+
+  <div class="container">
+
+    <!-- Direction -->
+    <div class="card">
+      <h2>交易方向 Direction</h2>
+      <div class="direction-row">
+        <button class="dir-btn active long"  id="btn-long"  onclick="setDirection('long')">▲ 做多 Long</button>
+        <button class="dir-btn short"         id="btn-short" onclick="setDirection('short')">▼ 做空 Short</button>
+      </div>
+    </div>
+
+    <!-- Inputs -->
+    <div class="card">
+      <h2>基本参数 Parameters</h2>
+      <div class="field-grid">
+        <div class="field">
+          <label>账户资金 Account Balance</label>
+          <div class="input-wrap">
+            <span class="prefix">$</span>
+            <input type="number" id="balance" placeholder="10000" min="0" step="any" oninput="calculate()" />
+            <span class="suffix"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label>风险比例 Risk %<span class="hint">per trade</span></label>
+          <div class="slider-field">
+            <div class="slider-row">
+              <input type="range" id="risk-slider" min="0.1" max="10" step="0.1" value="1" oninput="syncRisk(this.value)" />
+              <span class="slider-val" id="risk-display">1.0%</span>
+            </div>
+            <div class="input-wrap no-prefix">
+              <input type="number" id="risk" value="1" min="0.01" max="10" step="any" oninput="syncRiskInput(this.value)" />
+              <span class="suffix">%</span>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label>开仓价格 Entry Price</label>
+          <div class="input-wrap">
+            <span class="prefix">$</span>
+            <input type="number" id="entry" placeholder="50000" min="0" step="any" oninput="calculate()" />
+            <span class="suffix"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label>止损价格 Stop Loss</label>
+          <div class="input-wrap">
+            <span class="prefix">$</span>
+            <input type="number" id="stop" placeholder="49000" min="0" step="any" oninput="calculate()" />
+            <span class="suffix"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label>目标价格 Take Profit<span class="hint">optional</span></label>
+          <div class="input-wrap">
+            <span class="prefix">$</span>
+            <input type="number" id="target" placeholder="52000" min="0" step="any" oninput="calculate()" />
+            <span class="suffix"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label>杠杆倍数 Leverage<span class="hint">1 = spot</span></label>
+          <div class="input-wrap no-prefix">
+            <input type="number" id="leverage" value="1" min="1" max="125" step="1" oninput="calculate()" />
+            <span class="suffix">×</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warning -->
+    <div class="warning" id="warning"></div>
+
+    <!-- Results -->
+    <div class="card" id="results-card">
+      <h2>计算结果 Results</h2>
+      <div class="empty-state" id="empty-state">请填写参数后查看结果 · Fill in parameters to see results</div>
+      <div class="results-grid" id="results-grid" style="display:none">
+        <div class="result-item">
+          <div class="label">仓位大小 Position Size</div>
+          <div class="value" id="r-units">—</div>
+          <div class="sub" id="r-units-sub"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">开仓金额 Position Value</div>
+          <div class="value" id="r-value">—</div>
+          <div class="sub" id="r-margin-sub"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">最大亏损 Max Risk $</div>
+          <div class="value red" id="r-risk">—</div>
+          <div class="sub" id="r-risk-sub"></div>
+        </div>
+        <div class="result-item">
+          <div class="label">止损幅度 Stop Distance</div>
+          <div class="value" id="r-stop-pct">—</div>
+          <div class="sub" id="r-stop-abs"></div>
+        </div>
+        <div class="result-item" id="r-profit-item">
+          <div class="label">预期盈利 Expected Profit</div>
+          <div class="value green" id="r-profit">—</div>
+          <div class="sub" id="r-profit-sub"></div>
+        </div>
+        <div class="result-item" id="r-rr-item">
+          <div class="label">盈亏比 R:R Ratio</div>
+          <div class="value yellow" id="r-rr">—</div>
+          <div class="sub" id="r-rr-sub"></div>
+        </div>
+        <div class="result-item wide">
+          <div class="label">账户占用 Account Used</div>
+          <div class="value" id="r-pct-balance">—</div>
+          <div class="sub" id="r-pct-balance-sub"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>仓位计算器 · 仅供参考，不构成投资建议</footer>
+
+  <script>
+    let direction = 'long';
+
+    function setDirection(dir) {
+      direction = dir;
+      document.getElementById('btn-long').classList.toggle('active', dir === 'long');
+      document.getElementById('btn-short').classList.toggle('active', dir === 'short');
+      calculate();
+    }
+
+    function syncRisk(val) {
+      document.getElementById('risk').value = parseFloat(val).toFixed(1);
+      document.getElementById('risk-display').textContent = parseFloat(val).toFixed(1) + '%';
+      calculate();
+    }
+
+    function syncRiskInput(val) {
+      const v = Math.min(Math.max(parseFloat(val) || 0, 0.1), 10);
+      document.getElementById('risk-slider').value = v;
+      document.getElementById('risk-display').textContent = v.toFixed(1) + '%';
+      calculate();
+    }
+
+    function fmt(n, decimals = 2) {
+      if (n === null || n === undefined || isNaN(n)) return '—';
+      return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    function fmtUnits(n) {
+      if (n >= 1) return fmt(n, 4);
+      // Avoid scientific notation for very small values
+      if (n > 0 && n < 1e-7) return n.toFixed(10).replace(/\.?0+$/, '');
+      return n.toLocaleString('en-US', { minimumSignificantDigits: 1, maximumSignificantDigits: 4 });
+    }
+
+    function setResult(id, text, extraClass) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'value' + (extraClass ? ' ' + extraClass : '');
+    }
+
+    function calculate() {
+      const balance  = parseFloat(document.getElementById('balance').value);
+      const riskPct  = parseFloat(document.getElementById('risk').value);
+      const entry    = parseFloat(document.getElementById('entry').value);
+      const stop     = parseFloat(document.getElementById('stop').value);
+      const target   = parseFloat(document.getElementById('target').value);
+      const leverage = Math.min(Math.max(parseFloat(document.getElementById('leverage').value) || 1, 1), 125);
+
+      const warn = document.getElementById('warning');
+      const grid = document.getElementById('results-grid');
+      const empty = document.getElementById('empty-state');
+
+      // Validate required fields
+      if (!balance || !riskPct || !entry || !stop) {
+        warn.classList.remove('show');
+        grid.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+      }
+
+      warn.textContent = '';
+      warn.classList.remove('show');
+
+      // Direction validation
+      const isLong = direction === 'long';
+      if (isLong && stop >= entry) {
+        warn.textContent = '⚠ 做多时，止损价格应低于开仓价格 (Stop must be below entry for Long)';
+        warn.classList.add('show');
+        grid.style.display = 'none';
+        empty.style.display = 'none';
+        return;
+      }
+      if (!isLong && stop <= entry) {
+        warn.textContent = '⚠ 做空时，止损价格应高于开仓价格 (Stop must be above entry for Short)';
+        warn.classList.add('show');
+        grid.style.display = 'none';
+        empty.style.display = 'none';
+        return;
+      }
+
+      // Core calculation
+      const riskAmount   = balance * (riskPct / 100);              // $ at risk
+      const stopDistance = Math.abs(entry - stop);                 // per unit
+      const stopPct      = (stopDistance / entry) * 100;
+
+      // Units = riskAmount / stopDistance
+      const units        = riskAmount / stopDistance;
+      const positionValue = units * entry;                         // full position value
+      const margin       = positionValue / leverage;               // actual capital used
+
+      const pctOfBalance = (margin / balance) * 100;
+
+      // Profit / R:R
+      let profit = null, profitPct = null, rr = null;
+      if (!isNaN(target) && target > 0) {
+        // Validate target direction
+        if (isLong && target <= entry) {
+          warn.textContent = '⚠ 做多时，目标价格应高于开仓价格 (Take-profit must be above entry for Long)';
+          warn.classList.add('show');
+        } else if (!isLong && target >= entry) {
+          warn.textContent = '⚠ 做空时，目标价格应低于开仓价格 (Take-profit must be below entry for Short)';
+          warn.classList.add('show');
+        } else {
+          if (isLong) {
+            profit    = units * (target - entry);
+            profitPct = ((target - entry) / entry) * 100;
+          } else {
+            profit    = units * (entry - target);
+            profitPct = ((entry - target) / entry) * 100;
+          }
+          rr = profit / riskAmount;
+        }
+      }
+
+      // Render
+      grid.style.display = 'grid';
+      empty.style.display = 'none';
+
+      setResult('r-units', fmtUnits(units) + ' units');
+      document.getElementById('r-units-sub').textContent = `止损距离: $${fmt(stopDistance)}`;
+
+      setResult('r-value', '$' + fmt(positionValue));
+      document.getElementById('r-margin-sub').textContent =
+        leverage > 1 ? `保证金 Margin: $${fmt(margin)} (${leverage}×杠杆)` : `全额现货 Spot`;
+
+      setResult('r-risk', '-$' + fmt(riskAmount), 'red');
+      document.getElementById('r-risk-sub').textContent = `占账户 ${fmt(riskPct, 1)}%`;
+
+      setResult('r-stop-pct', fmt(stopPct, 2) + '%');
+      document.getElementById('r-stop-abs').textContent =
+        `$${fmt(entry)} → $${fmt(stop)} (${isLong ? '↓' : '↑'} $${fmt(stopDistance)})`;
+
+      if (profit !== null) {
+        setResult('r-profit', '+$' + fmt(profit), 'green');
+        document.getElementById('r-profit-sub').textContent = `+${fmt(profitPct, 2)}% · 目标 $${fmt(target)}`;
+        setResult('r-rr', '1 : ' + fmt(rr, 2), rr >= 2 ? 'green' : rr >= 1 ? 'yellow' : 'red');
+        document.getElementById('r-rr-sub').textContent =
+          rr >= 2 ? '✓ 盈亏比良好' : rr >= 1 ? '△ 盈亏比一般' : '✗ 盈亏比不佳';
+      } else {
+        setResult('r-profit', '—');
+        document.getElementById('r-profit-sub').textContent = '请填写目标价格 Fill target price';
+        setResult('r-rr', '—');
+        document.getElementById('r-rr-sub').textContent = '';
+      }
+
+      setResult('r-pct-balance', fmt(pctOfBalance, 2) + '% of account');
+      document.getElementById('r-pct-balance-sub').textContent =
+        `使用保证金 $${fmt(margin)} / 账户总额 $${fmt(balance)}`;
+    }
+
+    // Run on load with defaults
+    calculate();
+  </script>
+</body>
+</html>
